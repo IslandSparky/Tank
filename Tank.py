@@ -1,7 +1,7 @@
 ''' Tanks - beta version by Darwin I and Darwin II
     ver 0.1 intitial beta
     ver 0.2 add robot tanks
-    Version in Google Drive directory 2'''
+    ver 0.3 make space a shoot key'''
 
 import pygame, sys, time, random,math
 from pygame.locals import *
@@ -24,7 +24,8 @@ WINDOWWIDTH = 1250
 WINDOWHEIGHT = 750
 
 NUMBERMINES = 5     # NUMBER OF MINES TO SPRINKLE AROUND
-NUMBERROBOTS = 10     # NUMBER OF ROBOT TANKS TO SPRINKLE AROUND
+NUMBERREDROBOTS = 5 # NUMBER OF RED ROBOT TANKS 
+NUMBERYELLOWROBOTS = 5 # NUMBER OF YELLOW ROBOT TANKS
 BULLETSPEED = 10     # SPEED OF THE BULLET IN PIXELS PER UPDATE
 
 windowSurface = pygame.display.set_mode([WINDOWWIDTH, WINDOWHEIGHT])
@@ -45,7 +46,7 @@ class Tank(object):
         return # return from Tank.move_all
 
     def  __init__(self,center=(500,500),color=YELLOW,size=25,direction = 90,
-                  lives=5,ammo=25,speed=0):
+                  lives=5,ammo=25,speed=0,army=YELLOW):
 
     # This is the initializer called each time you create a new tank.
     # The size is specified as a single variable because the tank is drawn
@@ -57,6 +58,7 @@ class Tank(object):
         self.ammo = ammo    # number of rounds we can fire in each life
 
         self.speed = speed
+        self.army = army    # army he belongs to
         self.home = center  # remember center as the home base
 
         # add this tank to the list of tanks
@@ -274,8 +276,8 @@ class Tank(object):
 # Inherited class of Tank for robot tanks
 class Robot_Tank(Tank):
 
-    def  __init__(self,center=(500,500),color=GREEN,size=25,
-                  lives=1,ammo=10,speed=1,max_range=WINDOWWIDTH/10):
+    def  __init__(self,center=(500,500),color=LIGHTRED,size=25,
+                  lives=1,ammo=10,speed=1,max_range=WINDOWWIDTH/10,army=RED):
 
     # This is the initializer called each time you create a new robot tank.
     # The size is specified as a single variable because the tank is drawn
@@ -286,6 +288,7 @@ class Robot_Tank(Tank):
         self.lives = lives  # number of lives we have
         self.ammo = ammo    # number of rounds we can fire in each life
         self.speed = speed
+        self.army = army    # army he belongs to 
         self.max_range = max_range
 
         self.target = None  # initially not locked, otherwise hold target tank
@@ -321,10 +324,11 @@ class Robot_Tank(Tank):
 
         # if not locked on target, choose a live one at random
         while self.target == None:
-            index = random.randrange(0,len(Tank.tanks))  # only lock on to first two tanks
+            index = random.randrange(0,len(Tank.tanks))  # choose a random tank
             if  ((Tank.tanks[index] != self) &
                (Tank.tanks[index].lives >0)):   # see if this tank is still alive
-                    self.target = Tank.tanks[index] # live duck, latch on
+                    if ( Tank.tanks[index].army != self.army ):  # don't kill one of your own
+                        self.target = Tank.tanks[index] # live duck, latch on
 
 
         #*************
@@ -360,11 +364,13 @@ class Robot_Tank(Tank):
 
         
 
-        # Move, if we hit something, spin around in a random direction
+        # Move, if we hit something, reverse direction
         # and unlock from any targets.
         stuck = Tank.move(self)
         if stuck == True:  # True means we are stuck against something
-            self.direction = random.randrange(0, 359) # spin to random direction
+            self.direction = self.direction- (180/57.4)
+            if self.direction < 0 :
+                self.direction += (360/57.4)  # keep in 0 to 360 degrees
             self.target = None  # unlock from any targets
 
 
@@ -607,26 +613,47 @@ pygame.key.set_repeat(500,50) # 500 msec 'til repeat then 20 times a second
 # Create the tanks
 tank1_home = ( WINDOWWIDTH-100,int(WINDOWHEIGHT/2))
 tank1 = Tank(direction=90,speed=0,color=YELLOW,
-             center=tank1_home,lives=5,ammo=60 )
+             center=tank1_home,size=35,lives=5,ammo=60,army=YELLOW )
 
 tank2_home = (100,int(WINDOWHEIGHT/2))
 tank2 = Tank(direction=90,speed=0,color=RED,
-             center =tank2_home,lives=5,ammo=60)
+             center =tank2_home,size=35,lives=1,ammo=60,army=RED)
 
 # Create the barriers, starting with the home barriers
-Barrier(left=tank1_home[0]-25,top=tank1_home[1]-50,size=(10,100),color=WHITE)
-Barrier(left=tank2_home[0]+25,top=tank1_home[1]-50,size=(10,100),color=WHITE)
+Barrier(left=tank1_home[0]-50,top=tank1_home[1]-50,size=(10,100),color=YELLOW)
+Barrier(left=tank2_home[0]+25,top=tank1_home[1]-50,size=(10,100),color=RED)
 
-Barrier(left=500,top=250,size=(20,75),color=WHITE)  # create a barrier for test
 
-# Create the rest of the barriers, either in known places or random locations
+
+# Create the the barriers, either in known places or random locations
+Barrier(left=random.randrange(200,WINDOWWIDTH-200),
+        top=random.randrange(100,WINDOWHEIGHT-100),size=(20,75),color=WHITE)  # create a barrier
+Barrier(left=random.randrange(200,WINDOWWIDTH-200),
+        top=random.randrange(100,WINDOWHEIGHT-100),size=(20,75),color=WHITE)  # create a barrier
+Barrier(left=random.randrange(200,WINDOWWIDTH-200),
+        top=random.randrange(100,WINDOWHEIGHT-100),size=(20,75),color=WHITE)  # create a barrier
+Barrier(left=random.randrange(200,WINDOWWIDTH-200),
+        top=random.randrange(100,WINDOWHEIGHT-100),size=(20,75),color=WHITE)  # create a barrier
+Barrier(left=random.randrange(200,WINDOWWIDTH-200),
+        top=random.randrange(100,WINDOWHEIGHT-100),size=(20,75),color=WHITE)  # create a barrier
+Barrier(left=random.randrange(200,WINDOWWIDTH-200),
+        top=random.randrange(100,WINDOWHEIGHT-100),size=(20,75),color=WHITE)  # create a barrier
+Barrier(left=random.randrange(200,WINDOWWIDTH-200),
+        top=random.randrange(100,WINDOWHEIGHT-100),size=(20,75),color=WHITE)  # create a barrier
 
 # Create some robot hunter killer tanks for interest
-if NUMBERROBOTS > 0:
-    for i in range(0,NUMBERROBOTS):
+if NUMBERREDROBOTS > 0:  # First the red robots
+    for i in range(0,NUMBERREDROBOTS):
         Robot_Tank( center=( random.randrange(200,WINDOWWIDTH-200),
                       random.randrange(50,WINDOWHEIGHT-50) ),
-                      color=GREEN )    
+                      color=LIGHTRED,army=RED )
+
+if NUMBERYELLOWROBOTS > 0:  # First the red robots
+    for i in range(0,NUMBERYELLOWROBOTS):
+        Robot_Tank( center=( random.randrange(200,WINDOWWIDTH-200),
+                      random.randrange(50,WINDOWHEIGHT-50) ),
+                      color=LIGHTYELLOW,army=YELLOW )
+
 # Create the mines and show them for a few seconds, then hide
 if NUMBERMINES > 0:
     for i in range(0,NUMBERMINES):
@@ -657,7 +684,8 @@ while True:
                 tank1.turn(turn_angle = +2)
             elif(key == 'up'):  # shift up one gear
                 tank1.speed_up()
-            elif(key == 'end'): # shoot key - change as desired
+            elif( (key == 'end') |
+                  (key == 'space' ) ): # shoot key - change as desired
                 tank1.shoot()
                 update_scores(tank1,tank2)
 
