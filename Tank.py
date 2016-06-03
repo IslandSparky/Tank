@@ -23,9 +23,10 @@ BACKGROUND = (0,0,0)
 WINDOWWIDTH = 1250
 WINDOWHEIGHT = 750
 
-NUMBERMINES = 5     # NUMBER OF MINES TO SPRINKLE AROUND
-NUMBERREDROBOTS = 5 # NUMBER OF RED ROBOT TANKS 
-NUMBERYELLOWROBOTS = 5 # NUMBER OF YELLOW ROBOT TANKS
+NUMBERMINES = 1     # NUMBER OF MINES TO SPRINKLE AROUND
+NUMBERREDROBOTS = 10 # NUMBER OF RED ROBOT TANKS 
+NUMBERYELLOWROBOTS = 10 # NUMBER OF YELLOW ROBOT TANKS
+LOCKOUTTIME = 100  # LOCK OUT RETARGETING (NUMBER OF GAME CYCLES)
 BULLETSPEED = 10     # SPEED OF THE BULLET IN PIXELS PER UPDATE
 
 windowSurface = pygame.display.set_mode([WINDOWWIDTH, WINDOWHEIGHT])
@@ -117,10 +118,11 @@ class Tank(object):
         self.rect.center = (self.rect.center[0]+int(self.dx),
                             self.rect.center[1]+int(self.dy))
 
-        # if we hit a wall or a barrier, reverse out the move
+        # if we hit a wall,other tank or a barrier, reverse out the move
 
         if ( (check_wall(self.rect) != None) |
-              check_barrier(self.rect) ):
+             check_tank(self.rect)  |
+             check_barrier(self.rect) ):
             stuck = True
             self.rect.center = (self.rect.center[0]-int(self.dx),
                                 self.rect.center[1]-int(self.dy))
@@ -259,7 +261,7 @@ class Tank(object):
                 if rect.colliderect(barrier):
                     explode(rect.center,color,radius=20)
                     clean_track(rect,track)
-                    return None
+                    return 'Hit_Barrier'
             # wait a bit so we can follow the bullet
             time.sleep(bullet_wait)
 
@@ -291,7 +293,8 @@ class Robot_Tank(Tank):
         self.army = army    # army he belongs to 
         self.max_range = max_range
 
-        self.target = None  # initially not locked, otherwise hold target tank
+        self.target = None  # initially not targeted, otherwise hold target tank
+        self.lockout_timer = 0 # initially not lock out of targeting
     
         self.home = center  # remember center as the home base
 
@@ -320,58 +323,73 @@ class Robot_Tank(Tank):
     # robot.  It calls the Tank class move and shoot methods to do the actual
     # work.
 
-
+        #if someone else already killed your target, choose another
+        if self.target != None:
+            if self.target.lives <= 0:
+                self.target = None
 
         # if not locked on target, choose a live one at random
-        while self.target == None:
-            index = random.randrange(0,len(Tank.tanks))  # choose a random tank
-            if  ((Tank.tanks[index] != self) &
-               (Tank.tanks[index].lives >0)):   # see if this tank is still alive
-                    if ( Tank.tanks[index].army != self.army ):  # don't kill one of your own
-                        self.target = Tank.tanks[index] # live duck, latch on
+        if self.lockout_timer > 0:  # Don't retarget during lockout
+            self.lockout_timer -= 1  # Count down the timer
+        else:
+            while self.target == None:
+                index = random.randrange(0,len(Tank.tanks))  # choose a random tank
+                if  ((Tank.tanks[index] != self) &
+                   (Tank.tanks[index].lives >0)):   # see if this tank is still alive
+                        if ( Tank.tanks[index].army != self.army ):  # don't kill one of your own
+                            self.target = Tank.tanks[index] # live duck, latch on
 
 
         #*************
         # compute the angle to the target        
         #*************
        
+        if self.target != None:
+            x = self.rect.center[0]
+            y = self.rect.center[1]
+            targetx = self.target.rect.center[0]
+            targety = self.target.rect.center[1]
 
-        x = self.rect.center[0]
-        y = self.rect.center[1]
-        targetx = self.target.rect.center[0]
-        targety = self.target.rect.center[1]
+            # find the x and y distance to the target
 
-        # find the x and y distance to the target
+            xtotarget = targetx - x
+            ytotarget = -(targety - y)
 
-        xtotarget = targetx - x
-        ytotarget = -(targety - y)
+          
+            # compute direction to target
+            if (xtotarget == 0) :  # avoid infinite atan function
+                xtotarget = 1  # avoid a divide by zero
+            self.direction = 57.4 * math.atan(ytotarget/xtotarget)
+            if xtotarget < 0:
+                self.direction = self.direction + 180
 
-      
-        # compute direction to target
-        if (xtotarget == 0) :  # avoid infinite atan function
-            xtotarget = 1  # avoid a divide by zero
-        self.direction = 57.4 * math.atan(ytotarget/xtotarget)
-        if xtotarget < 0:
-            self.direction = self.direction + 180
+            # distance to target
+            distancetotarget = math.sqrt(xtotarget**2+ ytotarget**2)
 
-        # distance to target
-        distancetotarget = math.sqrt(xtotarget**2+ ytotarget**2)
-
-        # if target in range of our short gun, shoot and unlock from him
-        if abs(distancetotarget) < self.max_range:
-            self.shoot(max_range = self.max_range)
-            self.target = None
+            # if target in range of our short gun, shoot and unlock from him
+            if abs(distancetotarget) < self.max_range:
+                
+                if(self.shoot(max_range = self.max_range) == 'Hit_Barrier'):
+                    self.direction = self.direction- (random.randrange(100,260))
+                    if self.direction < 0 :
+                        self.direction += (360)  # keep in 0 to 360 degrees
+                    self.lockout_timer = LOCKOUTTIME # don't retarget until we clear barrier                   
+                self.target = None  # Drop this guy as a target
 
         
 
         # Move, if we hit something, reverse direction
         # and unlock from any targets.
+
         stuck = Tank.move(self)
         if stuck == True:  # True means we are stuck against something
-            self.direction = self.direction- (180/57.4)
+            self.direction = self.direction- (random.randrange(100,260))
             if self.direction < 0 :
-                self.direction += (360/57.4)  # keep in 0 to 360 degrees
+                self.direction += (360)  # keep in 0 to 360 degrees
             self.target = None  # unlock from any targets
+            self.lockout_timer = LOCKOUTTIME # don't retarget until we clear obstacle
+
+            Tank.move(self) # back away from barrier
 
 
 
@@ -418,6 +436,21 @@ class Mine(object):
     mines = []   # hold the list of mines
     last_shown = time.time()  # when mines were last shown
 
+    def __init__(self,center=(300,300),size= 10,color=BLUE):
+    # initializer for mine, called when one is created
+        self.color = color # save color as attribute
+        self.armed = True # arm the mine
+    
+        # Add to list of mines
+        Mine.mines.append(self)
+
+
+        # build a rectangle for this mine and save as attribute
+        self.rect = pygame.Rect(center[0]-int(size/2),center[1]-int(size/2),
+                                size,size)
+
+        return # return from Mine.__init__
+
     def show_all():
     #Called at the Mine class level to show all the mines
         for i in range( 0,len(Mine.mines) ):
@@ -462,20 +495,7 @@ class Mine(object):
                 
             
 
-    def __init__(self,center=(300,300),size= 10,color=BLUE):
-    # initializer for mine, called when one is created
-        self.color = color # save color as attribute
-        self.armed = True # arm the mine
-    
-        # Add to list of barriers
-        Mine.mines.append(self)
 
-
-        # build a rectangle for this mine and save as attribute
-        self.rect = pygame.Rect(center[0]-int(size/2),center[1]-int(size/2),
-                                size,size)
-
-        return # return from Barrier.__init__
 
     def draw(self):
     # Mine method to draw the mine. Does update the display
@@ -512,11 +532,23 @@ def check_wall(rect):
 def check_barrier(rect):
 # General purpose function to test if an  hit a barrier.
 # Call with a rectangle object
-# Returns None if no wall struck, otherwise True
+# Returns None if no barruer struck, otherwise True
 
     # Run through the list of barriers to see if we hit one
     for barrier in Barrier.barriers:
         if rect.colliderect(barrier.rect):
+            return True
+
+    return False
+
+def check_tank(rect):
+# General purpose function to test if an  hit another tank
+# Call with a rectangle object
+# Returns None if no other tank struck, otherwise True
+    # Run through the list of tanks to see if we bumped into one
+    for tank in Tank.tanks:
+        if (rect.colliderect(tank.rect) &
+           (tank.rect != rect) ):
             return True
 
     return False
@@ -613,15 +645,15 @@ pygame.key.set_repeat(500,50) # 500 msec 'til repeat then 20 times a second
 # Create the tanks
 tank1_home = ( WINDOWWIDTH-100,int(WINDOWHEIGHT/2))
 tank1 = Tank(direction=90,speed=0,color=YELLOW,
-             center=tank1_home,size=35,lives=5,ammo=60,army=YELLOW )
+            center=tank1_home,size=35,lives=1,ammo=60,army=YELLOW )
 
 tank2_home = (100,int(WINDOWHEIGHT/2))
-tank2 = Tank(direction=90,speed=0,color=RED,
+tank2 = Robot_Tank(speed=2,color=RED,max_range=WINDOWWIDTH/2,
              center =tank2_home,size=35,lives=1,ammo=60,army=RED)
 
 # Create the barriers, starting with the home barriers
 Barrier(left=tank1_home[0]-50,top=tank1_home[1]-50,size=(10,100),color=YELLOW)
-Barrier(left=tank2_home[0]+25,top=tank1_home[1]-50,size=(10,100),color=RED)
+
 
 
 
@@ -648,7 +680,7 @@ if NUMBERREDROBOTS > 0:  # First the red robots
                       random.randrange(50,WINDOWHEIGHT-50) ),
                       color=LIGHTRED,army=RED )
 
-if NUMBERYELLOWROBOTS > 0:  # First the red robots
+if NUMBERYELLOWROBOTS > 0:  # Then the yellow robots
     for i in range(0,NUMBERYELLOWROBOTS):
         Robot_Tank( center=( random.randrange(200,WINDOWWIDTH-200),
                       random.randrange(50,WINDOWHEIGHT-50) ),
@@ -689,8 +721,7 @@ while True:
                 tank1.shoot()
                 update_scores(tank1,tank2)
 
-
-          #************** put in logic for second tank keys *****************          
+     
 
     # check for end of game
     if (tank1.lives < 1) | (tank2.lives < 1): # see if either one is dead
@@ -701,7 +732,6 @@ while True:
         elif (tank1.lives < 1):
             write_text(text= 'RED TANK WINS',
                        topleft=(250,250),font_size=90,color=RED)
-
         
         time.sleep(5) # display winning message for 5 seconds
         pygame.quit()
