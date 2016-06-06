@@ -23,10 +23,10 @@ BACKGROUND = (0,0,0)
 WINDOWWIDTH = 1250
 WINDOWHEIGHT = 750
 
-NUMBERMINES = 1     # NUMBER OF MINES TO SPRINKLE AROUND
+NUMBERMINES = 0     # NUMBER OF MINES TO SPRINKLE AROUND
 NUMBERREDROBOTS = 10 # NUMBER OF RED ROBOT TANKS 
 NUMBERYELLOWROBOTS = 10 # NUMBER OF YELLOW ROBOT TANKS
-LOCKOUTTIME = 100  # LOCK OUT RETARGETING (NUMBER OF GAME CYCLES)
+NUMBERBARRIERS = 10   # NUMBER OF BARRIERS
 SLEWANGLE = 1       # AMOUNT OF ANGLE ROBOT CAN SLEW PER MOVE
 BULLETSPEED = 10     # SPEED OF THE BULLET IN PIXELS PER UPDATE
 
@@ -276,24 +276,33 @@ class Tank(object):
 #-----------------End of Tank Class----------------------------------------
 
 #---------------------Robot Tank Class ver 0.2--------------------------------------
-# Inherited class of Tank for robot tanks
-class Robot_Tank(Tank):
+# Inherited classes of Tank for robot tanks
 
-    def  __init__(self,center=(500,500),color=LIGHTRED,size=25,
-                  lives=1,ammo=10,speed=1,max_range=WINDOWWIDTH/10,army=RED):
+###################################################################################
+### Competition logic for red robot tanks inserted here
+###################################################################################
+
+
+class Red_Robot_Tank(Tank):
+
+
+    def  __init__(self,center=(500,500),color=LIGHTRED,size=25,direction=180,
+                  lives=1,ammo=10,speed=1,max_range=WINDOWWIDTH/10,army=RED,
+                  tank_type='Scout'):
 
     # This is the initializer called each time you create a new robot tank.
     # The size is specified as a single variable because the tank is drawn
     # in a square.
         self.color = color
         self.size = size
-        self.direction = random.randrange(0,359) # direction the tank (and gun) is pointed
+        self.direction = direction # direction the tank (and gun) is pointed
         self.direction_to_target = self.direction # init value before targeting
         self.lives = lives  # number of lives we have
         self.ammo = ammo    # number of rounds we can fire in each life
         self.speed = speed
-        self.army = army    # army he belongs to 
         self.max_range = max_range
+        self.army = army    # army he belongs to 
+        self.tank_type = tank_type  # Either 'Scout' or 'Master' 
 
         self.target = None  # initially not targeted, otherwise hold target tank
         self.lockout_timer = 0 # initially not lock out of targeting
@@ -328,6 +337,7 @@ class Robot_Tank(Tank):
     # robot.  It calls the Tank class move and shoot methods to do the actual
     # work.
 
+        LOCKOUTTIME = 50  # LOCK OUT RETARGETING (NUMBER OF GAME CYCLES)       
         ALLOWED_AIM_ERROR = 2 # Allow 2 degrees error in aim.
 
         #if someone else already killed your target, choose another
@@ -390,8 +400,140 @@ class Robot_Tank(Tank):
 
 
 
-        return # return from Robot_Tank.move
+        return # return from red Robot_Tank.move
 
+###################################################################################
+#### End of competition logic for red robot tanks
+###################################################################################
+
+
+###################################################################################
+### Competition logic for Yellow robot tanks inserted here
+###################################################################################    
+    
+
+class Yellow_Robot_Tank(Tank):
+
+
+    def  __init__(self,center=(500,500),color=LIGHTRED,size=25,direction=180,
+                  lives=1,ammo=10,speed=1,max_range=WINDOWWIDTH/10,army=RED,
+                  tank_type='Scout'):
+
+    # This is the initializer called each time you create a new robot tank.
+    # The size is specified as a single variable because the tank is drawn
+    # in a square.
+        self.color = color
+        self.size = size
+        self.direction = direction # direction the tank (and gun) is pointed
+        self.direction_to_target = self.direction # init value before targeting
+        self.lives = lives  # number of lives we have
+        self.ammo = ammo    # number of rounds we can fire in each life
+        self.speed = speed
+        self.max_range = max_range
+        self.army = army    # army he belongs to
+        self.tank_type = tank_type  # Either 'Scout' or 'Master' 
+
+        self.target = None  # initially not targeted, otherwise hold target tank
+        self.lockout_timer = 0 # initially not lock out of targeting
+    
+        self.home = center  # remember center as the home base
+
+        # add this tank to the list of tanks
+        Tank.tanks.append(self)
+
+
+        # dx and dy are the distance accumulators for the distance not moved
+        # by the integer pixel count
+        self.dx = 0.
+        self.dy = 0.
+
+        # build a rectangle for this tank and save as an attribute
+        # center was given rather than topleft, so adjust for half the size
+        self.rect = pygame.Rect(center[0]-int(size/2),
+                                center[1]-int(size/2),size,size)
+
+        ''' Put in logic here to check if we are on an already existing tank or barrier
+                and if so, move slightly to get off it.  '''
+        
+
+        # now draw the tank
+        self.draw()
+
+        return # return from Robot_Tank.__init__
+
+    def move(self):
+    # Overload the tank move class so we can check for special actions for the
+    # robot.  It calls the Tank class move and shoot methods to do the actual
+    # work.
+
+        LOCKOUTTIME = 50  # LOCK OUT RETARGETING (NUMBER OF GAME CYCLES)       
+        ALLOWED_AIM_ERROR = 2 # Allow 2 degrees error in aim.
+
+        #if someone else already killed your target, choose another
+        if self.target != None:
+            if self.target.lives <= 0:
+                self.target = None
+
+        # if not locked on target, choose a live one at random
+        if self.lockout_timer > 0:  # Don't retarget during lockout
+            self.lockout_timer -= 1  # Count down the timer
+        else:
+            while self.target == None:
+                index = random.randrange(0,len(Tank.tanks))  # choose a random tank
+                if  ((Tank.tanks[index] != self) &
+                   (Tank.tanks[index].lives >0)):   # see if this tank is still alive
+                        if ( Tank.tanks[index].army != self.army ):  # don't kill one of your own
+                            self.target = Tank.tanks[index] # live duck, latch on
+
+
+# If we have a target, see if we can shoot him.
+
+        if self.target != None:
+
+            # find distance and direction using general purpose function
+            
+            self.direction_to_target,distance_to_target = locate(self.rect,self.target.rect)
+
+            # see if gun is pointed in his direction
+            if (is_aim_ok(self.direction,self.direction_to_target,ALLOWED_AIM_ERROR)):
+          
+           
+                # aim is OK, if target in range of our gun, shoot and unlock from him
+                if abs(distance_to_target) < self.max_range:
+                    
+                    if(self.shoot(max_range = self.max_range) == 'Hit_Barrier'):
+                        self.direction = self.direction- (random.randrange(100,260))
+                        if self.direction < 0 :
+                            self.direction += (360)  # keep in 0 to 360 degrees
+                        self.lockout_timer = LOCKOUTTIME # don't retarget until we clear barrier                   
+                    self.target = None  # Drop this guy as a target
+
+        # Slew the turrent toward the target by a slew angle increment
+            self.direction = slew(self.direction,self.direction_to_target,SLEWANGLE)
+
+        # Move, if we bumped into something, reverse direction
+        # and unlock from any targets.
+
+        stuck = Tank.move(self)
+        if stuck == True:  # True means we are stuck against something
+            self.direction = self.direction- (random.randrange(100,260))
+            if self.direction < 0 :
+                self.direction += 360  # keep in 0 to 360 degrees
+            elif self.direction > 360:
+                self.direction -= 360
+            self.target = None  # unlock from any targets
+            self.lockout_timer = LOCKOUTTIME # don't retarget until we clear obstacle
+
+            Tank.move(self) # back away from barrier
+
+
+
+
+        return # return from yellow Robot_Tank.move
+
+###################################################################################
+#### End of competition logic for yellow robot tanks
+###################################################################################
 
 #----------------   End of Robot_Tank class -------------------------------
     
@@ -736,47 +878,39 @@ pygame.key.set_repeat(500,50) # 500 msec 'til repeat then 20 times a second
 
 # Create the tanks
 tank1_home = ( WINDOWWIDTH-100,int(WINDOWHEIGHT/2))
-tank1 = Tank(direction=90,speed=0,color=YELLOW,
-            center=tank1_home,size=35,lives=1,ammo=60,army=YELLOW )
+tank1 = Yellow_Robot_Tank(speed=2,direction=180,color=YELLOW,
+            center=tank1_home,size=35,lives=1,ammo=30,army=YELLOW,
+            tank_type='Master')
 
 tank2_home = (100,int(WINDOWHEIGHT/2))
-tank2 = Robot_Tank(speed=2,color=RED,max_range=WINDOWWIDTH/2,
-             center =tank2_home,size=35,lives=1,ammo=60,army=RED)
-
-# Create the barriers, starting with the home barriers
-Barrier(left=tank1_home[0]-50,top=tank1_home[1]-50,size=(10,100),color=YELLOW)
+tank2 = Red_Robot_Tank(speed=2,direction=0,color=RED,max_range=WINDOWWIDTH/2,
+             center =tank2_home,size=35,lives=1,ammo=30,army=RED,
+             tank_type='Master')
 
 
 
 
-# Create the the barriers, either in known places or random locations
-Barrier(left=random.randrange(200,WINDOWWIDTH-200),
+
+# Create the the barriers, either in  random locations
+
+for i in range (0, NUMBERBARRIERS):
+    Barrier(left=random.randrange(250,WINDOWWIDTH-250),
         top=random.randrange(100,WINDOWHEIGHT-100),size=(20,75),color=WHITE)  # create a barrier
-Barrier(left=random.randrange(200,WINDOWWIDTH-200),
-        top=random.randrange(100,WINDOWHEIGHT-100),size=(20,75),color=WHITE)  # create a barrier
-Barrier(left=random.randrange(200,WINDOWWIDTH-200),
-        top=random.randrange(100,WINDOWHEIGHT-100),size=(20,75),color=WHITE)  # create a barrier
-Barrier(left=random.randrange(200,WINDOWWIDTH-200),
-        top=random.randrange(100,WINDOWHEIGHT-100),size=(20,75),color=WHITE)  # create a barrier
-Barrier(left=random.randrange(200,WINDOWWIDTH-200),
-        top=random.randrange(100,WINDOWHEIGHT-100),size=(20,75),color=WHITE)  # create a barrier
-Barrier(left=random.randrange(200,WINDOWWIDTH-200),
-        top=random.randrange(100,WINDOWHEIGHT-100),size=(20,75),color=WHITE)  # create a barrier
-Barrier(left=random.randrange(200,WINDOWWIDTH-200),
-        top=random.randrange(100,WINDOWHEIGHT-100),size=(20,75),color=WHITE)  # create a barrier
+
 
 # Create some robot hunter killer tanks for interest
 if NUMBERREDROBOTS > 0:  # First the red robots
     for i in range(0,NUMBERREDROBOTS):
-        Robot_Tank( center=( random.randrange(200,WINDOWWIDTH-200),
-                      random.randrange(50,WINDOWHEIGHT-50) ),
-                      color=LIGHTRED,army=RED )
+        Red_Robot_Tank( center=( 200,WINDOWHEIGHT-100- (75*i) ),
+                      direction=0,color=LIGHTRED,army=RED,
+                      tank_type='Scout')
 
 if NUMBERYELLOWROBOTS > 0:  # Then the yellow robots
     for i in range(0,NUMBERYELLOWROBOTS):
-        Robot_Tank( center=( random.randrange(200,WINDOWWIDTH-200),
-                      random.randrange(50,WINDOWHEIGHT-50) ),
-                      color=LIGHTYELLOW,army=YELLOW )
+        Yellow_Robot_Tank( center=( WINDOWWIDTH-200,
+                     WINDOWHEIGHT-100 - (75*i) ),
+                      direction=180,color=LIGHTYELLOW,army=YELLOW,
+                      tank_type='Scout')
 
 # Create the mines and show them for a few seconds, then hide
 if NUMBERMINES > 0:
