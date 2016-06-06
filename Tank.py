@@ -27,6 +27,7 @@ NUMBERMINES = 1     # NUMBER OF MINES TO SPRINKLE AROUND
 NUMBERREDROBOTS = 10 # NUMBER OF RED ROBOT TANKS 
 NUMBERYELLOWROBOTS = 10 # NUMBER OF YELLOW ROBOT TANKS
 LOCKOUTTIME = 100  # LOCK OUT RETARGETING (NUMBER OF GAME CYCLES)
+SLEWANGLE = 1       # AMOUNT OF ANGLE ROBOT CAN SLEW PER MOVE
 BULLETSPEED = 10     # SPEED OF THE BULLET IN PIXELS PER UPDATE
 
 windowSurface = pygame.display.set_mode([WINDOWWIDTH, WINDOWHEIGHT])
@@ -287,6 +288,7 @@ class Robot_Tank(Tank):
         self.color = color
         self.size = size
         self.direction = random.randrange(0,359) # direction the tank (and gun) is pointed
+        self.direction_to_target = self.direction # init value before targeting
         self.lives = lives  # number of lives we have
         self.ammo = ammo    # number of rounds we can fire in each life
         self.speed = speed
@@ -311,6 +313,9 @@ class Robot_Tank(Tank):
         # center was given rather than topleft, so adjust for half the size
         self.rect = pygame.Rect(center[0]-int(size/2),
                                 center[1]-int(size/2),size,size)
+
+        ''' Put in logic here to check if we are on an already existing tank or barrier
+                and if so, move slightly to get off it.  '''
         
 
         # now draw the tank
@@ -322,6 +327,8 @@ class Robot_Tank(Tank):
     # Overload the tank move class so we can check for special actions for the
     # robot.  It calls the Tank class move and shoot methods to do the actual
     # work.
+
+        ALLOWED_AIM_ERROR = 2 # Allow 2 degrees error in aim.
 
         #if someone else already killed your target, choose another
         if self.target != None:
@@ -340,52 +347,41 @@ class Robot_Tank(Tank):
                             self.target = Tank.tanks[index] # live duck, latch on
 
 
-        #*************
-        # compute the angle to the target        
-        #*************
-       
+# If we have a target, see if we can shoot him.
+
         if self.target != None:
-            x = self.rect.center[0]
-            y = self.rect.center[1]
-            targetx = self.target.rect.center[0]
-            targety = self.target.rect.center[1]
 
-            # find the x and y distance to the target
+            # find distance and direction using general purpose function
+            
+            self.direction_to_target,distance_to_target = locate(self.rect,self.target.rect)
 
-            xtotarget = targetx - x
-            ytotarget = -(targety - y)
-
+            # see if gun is pointed in his direction
+            if (is_aim_ok(self.direction,self.direction_to_target,ALLOWED_AIM_ERROR)):
           
-            # compute direction to target
-            if (xtotarget == 0) :  # avoid infinite atan function
-                xtotarget = 1  # avoid a divide by zero
-            self.direction = 57.4 * math.atan(ytotarget/xtotarget)
-            if xtotarget < 0:
-                self.direction = self.direction + 180
+           
+                # aim is OK, if target in range of our gun, shoot and unlock from him
+                if abs(distance_to_target) < self.max_range:
+                    
+                    if(self.shoot(max_range = self.max_range) == 'Hit_Barrier'):
+                        self.direction = self.direction- (random.randrange(100,260))
+                        if self.direction < 0 :
+                            self.direction += (360)  # keep in 0 to 360 degrees
+                        self.lockout_timer = LOCKOUTTIME # don't retarget until we clear barrier                   
+                    self.target = None  # Drop this guy as a target
 
-            # distance to target
-            distancetotarget = math.sqrt(xtotarget**2+ ytotarget**2)
+        # Slew the turrent toward the target by a slew angle increment
+            self.direction = slew(self.direction,self.direction_to_target,SLEWANGLE)
 
-            # if target in range of our short gun, shoot and unlock from him
-            if abs(distancetotarget) < self.max_range:
-                
-                if(self.shoot(max_range = self.max_range) == 'Hit_Barrier'):
-                    self.direction = self.direction- (random.randrange(100,260))
-                    if self.direction < 0 :
-                        self.direction += (360)  # keep in 0 to 360 degrees
-                    self.lockout_timer = LOCKOUTTIME # don't retarget until we clear barrier                   
-                self.target = None  # Drop this guy as a target
-
-        
-
-        # Move, if we hit something, reverse direction
+        # Move, if we bumped into something, reverse direction
         # and unlock from any targets.
 
         stuck = Tank.move(self)
         if stuck == True:  # True means we are stuck against something
             self.direction = self.direction- (random.randrange(100,260))
             if self.direction < 0 :
-                self.direction += (360)  # keep in 0 to 360 degrees
+                self.direction += 360  # keep in 0 to 360 degrees
+            elif self.direction > 360:
+                self.direction -= 360
             self.target = None  # unlock from any targets
             self.lockout_timer = LOCKOUTTIME # don't retarget until we clear obstacle
 
@@ -513,6 +509,102 @@ class Mine(object):
 
 
 #---------------- General purpose functions not part of a class ver 0.1 ---------
+
+# General purpose robot routine to slew direction toward a target 
+# by an increment of angle. Return the revised direction.
+
+def slew(direction,direction_to_target,slewangle):
+
+   
+    delta_angle = direction_to_target - direction
+
+    if  ((delta_angle <0) & (abs(delta_angle) >= 180) ):
+        slew = 'left'
+    elif  ( (delta_angle >0) & (abs(delta_angle) >= 180) ):
+        slew = 'right'
+    elif ( (delta_angle > 0) & (abs(delta_angle) <= 180) ):
+        slew = 'left'
+    elif ( (delta_angle < 0) & (abs(delta_angle) <= 180) ):
+        slew = 'right'
+    else:
+        slew = 'none'
+
+    # slew the direction toward the target by the slew angle
+
+    if slew == 'right':
+        direction -= slewangle
+    elif slew == 'left':
+        direction += slewangle
+    else:
+        return direction # no action required
+
+    # correct for cross the zero axis
+    if direction < 0:
+        direction += 360
+    if direction > 360:
+        direction -= 360
+
+    
+    return direction
+
+# General purpose robot routine to determine the angle and distance between two
+# retangles. Returns angle and distance.
+
+def locate(source_rectangle,destination_rectangle):
+
+    x = source_rectangle.center[0]
+    y = source_rectangle.center[1]
+    targetx = destination_rectangle.center[0]
+    targety = destination_rectangle.center[1]
+
+    # find the x and y distance to the target
+
+    xtotarget = targetx - x
+    ytotarget = -(targety - y)
+
+  
+    # compute direction to target, move will slew toward him.
+    if (xtotarget == 0) :  # avoid infinite atan function
+        xtotarget = 1  # avoid a divide by zero
+    direction_to_target = 57.4 * math.atan(ytotarget/xtotarget)
+    if xtotarget < 0:
+        direction_to_target = direction_to_target + 180
+
+    
+    # distance to target
+    distance_to_target = math.sqrt(xtotarget**2+ ytotarget**2)
+
+    return (direction_to_target,distance_to_target)
+            
+# general purpose robot routine to see if the target is in the
+# angle range of the direction we are pointed. Returns True if we are
+# on target.
+
+def is_aim_ok(direction,direction_to_target,tolerance):
+
+
+    # first fix any issues with crossing the zero axis.
+
+    if (  (direction > 0 & (direction < 90) ) &
+            (direction_to_target >270) ):
+
+            direction += 180  # move to left quantrant
+            direction_to_target -= 180
+
+    elif ( (direction_to_target > 0 & (direction_to_target < 90) ) &
+            (direction > 270) ):
+
+           direction_to_target += 180 # move to left quantrant
+           direction -= 180
+
+    # that possible problem fixed, now do the compare and return
+    # either true or false
+
+   
+    if ( abs(direction - direction_to_target) <= tolerance ):
+        return True
+    else:
+        return False
     
 def check_wall(rect):
 # General purpose function to test if an  hit a wall.
