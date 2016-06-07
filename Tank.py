@@ -1,8 +1,19 @@
-''' Tanks - beta version by Darwin I and Darwin II
+''' 
+Tanks - compatition version by Darwin I and Darwin II
     ver 0.1 intitial beta
     ver 0.2 add robot tanks
-    ver 0.3 make space a shoot key'''
+    ver 0.3 make space a shoot key
+    ver 0.4 Branched by Darwin
+    ver 1.0 Added all compatition capibilities
+	-On each side there are a given amount of bot tanks and 1 'command' tank
+		~The robot tanks have less range than the command tank
+		~The Master tank has longer range than the robot tanks 
+'''
+''' 
+Programmer Changelog
 
+Darwin - 6/6/2016 9:16PM - Began this changelog and commanted out mine blib
+'''
 import pygame, sys, time, random,math
 from pygame.locals import *
 
@@ -964,7 +975,7 @@ while True:
         sys.exit()
         
     # do the routine update things each time through the main loop   
-    Mine.flash_all(period=15,flashtime=1) # maybe give a peek at mines   
+    # Mine.flash_all(period=15,flashtime=1) # maybe give a peek at mines   
     Tank.move_all()
     pygame.display.update()
     time.sleep(.05)
