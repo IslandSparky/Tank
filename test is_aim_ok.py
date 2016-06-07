@@ -31,6 +31,7 @@ def is_aim_ok(direction,direction_to_target,tolerance):
         return False
 
 print (is_aim_ok(50,51,3))
+print (is_aim_ok(51,50,3))
 print (is_aim_ok(50,54,3))
 print (is_aim_ok(1,359,3) )
 print (is_aim_ok(359,1,3) )

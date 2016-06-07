@@ -27,6 +27,8 @@ NUMBERMINES = 0     # NUMBER OF MINES TO SPRINKLE AROUND
 NUMBERREDROBOTS = 10 # NUMBER OF RED ROBOT TANKS 
 NUMBERYELLOWROBOTS = 10 # NUMBER OF YELLOW ROBOT TANKS
 NUMBERBARRIERS = 10   # NUMBER OF BARRIERS
+
+MAXSPEED = 3        # MAXIMUM SPEED A TANK CAN GO
 SLEWANGLE = 1       # AMOUNT OF ANGLE ROBOT CAN SLEW PER MOVE
 BULLETSPEED = 10     # SPEED OF THE BULLET IN PIXELS PER UPDATE
 
@@ -152,8 +154,6 @@ class Tank(object):
 
     def speed_up(self):
     # Tank method to increase the speed. Can't go more than MAXSPEED
-
-        MAXSPEED = 3
 
         
         if self.speed < MAXSPEED:
@@ -337,7 +337,7 @@ class Red_Robot_Tank(Tank):
     # robot.  It calls the Tank class move and shoot methods to do the actual
     # work.
 
-        LOCKOUTTIME = 50  # LOCK OUT RETARGETING (NUMBER OF GAME CYCLES)       
+        LOCKOUTTIME = 25  # LOCK OUT RETARGETING (NUMBER OF GAME CYCLES)       
         ALLOWED_AIM_ERROR = 2 # Allow 2 degrees error in aim.
 
         #if someone else already killed your target, choose another
@@ -466,7 +466,7 @@ class Yellow_Robot_Tank(Tank):
     # robot.  It calls the Tank class move and shoot methods to do the actual
     # work.
 
-        LOCKOUTTIME = 50  # LOCK OUT RETARGETING (NUMBER OF GAME CYCLES)       
+        LOCKOUTTIME = 25  # LOCK OUT RETARGETING (NUMBER OF GAME CYCLES)       
         ALLOWED_AIM_ERROR = 2 # Allow 2 degrees error in aim.
 
         #if someone else already killed your target, choose another
@@ -502,7 +502,7 @@ class Yellow_Robot_Tank(Tank):
                 if abs(distance_to_target) < self.max_range:
                     
                     if(self.shoot(max_range = self.max_range) == 'Hit_Barrier'):
-                        self.direction = self.direction- (random.randrange(100,260))
+                        self.direction = self.direction- (random.randrange(91,269))
                         if self.direction < 0 :
                             self.direction += (360)  # keep in 0 to 360 degrees
                         self.lockout_timer = LOCKOUTTIME # don't retarget until we clear barrier                   
@@ -877,18 +877,16 @@ def update_scores(tank1,tank2):
 pygame.key.set_repeat(500,50) # 500 msec 'til repeat then 20 times a second
 
 # Create the tanks
-tank1_home = ( WINDOWWIDTH-100,int(WINDOWHEIGHT/2))
+tank1_home = ( WINDOWWIDTH-100,int(WINDOWHEIGHT/4))
 tank1 = Yellow_Robot_Tank(speed=2,direction=180,color=YELLOW,
+            max_range= WINDOWWIDTH/4,
             center=tank1_home,size=35,lives=1,ammo=30,army=YELLOW,
             tank_type='Master')
 
 tank2_home = (100,int(WINDOWHEIGHT/2))
-tank2 = Red_Robot_Tank(speed=2,direction=0,color=RED,max_range=WINDOWWIDTH/2,
+tank2 = Red_Robot_Tank(speed=2,direction=0,color=RED,max_range=WINDOWWIDTH/4,
              center =tank2_home,size=35,lives=1,ammo=30,army=RED,
              tank_type='Master')
-
-
-
 
 
 # Create the the barriers, either in  random locations
@@ -901,16 +899,16 @@ for i in range (0, NUMBERBARRIERS):
 # Create some robot hunter killer tanks for interest
 if NUMBERREDROBOTS > 0:  # First the red robots
     for i in range(0,NUMBERREDROBOTS):
-        Red_Robot_Tank( center=( 200,WINDOWHEIGHT-100- (75*i) ),
+        Red_Robot_Tank(speed=2, center=( 200,WINDOWHEIGHT-100- (75*i) ),
                       direction=0,color=LIGHTRED,army=RED,
-                      tank_type='Scout')
+                      max_range=WINDOWWIDTH/10,tank_type='Scout')
 
 if NUMBERYELLOWROBOTS > 0:  # Then the yellow robots
     for i in range(0,NUMBERYELLOWROBOTS):
-        Yellow_Robot_Tank( center=( WINDOWWIDTH-200,
+        Yellow_Robot_Tank(speed=2, center=( WINDOWWIDTH-200,
                      WINDOWHEIGHT-100 - (75*i) ),
                       direction=180,color=LIGHTYELLOW,army=YELLOW,
-                      tank_type='Scout')
+                      max_range=WINDOWWIDTH/10,tank_type='Scout')
 
 # Create the mines and show them for a few seconds, then hide
 if NUMBERMINES > 0:
@@ -964,10 +962,11 @@ while True:
         sys.exit()
         
     # do the routine update things each time through the main loop   
-    Mine.flash_all(period=15,flashtime=1) # maybe give a peek at mines   
+    if (NUMBERMINES > 0):
+        Mine.flash_all(period=15,flashtime=1) # maybe give a peek at mines   
     Tank.move_all()
     pygame.display.update()
-    time.sleep(.05)
+    time.sleep(.10)
 
 
 sys.exit() # shouldn't ever get here.  Exit is in main loop.
