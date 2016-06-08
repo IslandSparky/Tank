@@ -1,7 +1,16 @@
 ''' Tanks - beta version by Darwin I and Darwin II
     ver 0.1 intitial beta
     ver 0.2 add robot tanks
-    ver 0.3 make space a shoot key'''
+    ver 0.3 make space a shoot key
+    ver 1.0 Added all competition capibilities
+	-On each side there are a given amount of bot tanks and 1 'Master' tank
+		~The robot tanks have less range than the command tank
+		~The Master tank has longer range than the robot tanks 
+
+ 
+Programmer Changelog
+
+Loqoman - 6/6/2016 9:16PM - Began this changelog and removed out mine blip '''
 
 import pygame, sys, time, random,math
 from pygame.locals import *
@@ -917,7 +926,8 @@ if NUMBERMINES > 0:
                       random.randrange(50,WINDOWHEIGHT-50) ),
                       size=10,color=BLUE )
 
-Mine.flash_all(period=0,flashtime=5) # give folks a peek to start with
+if NUMBERMINES >0:
+    Mine.flash_all(period=0,flashtime=5) # if mined, give folks a peek to start 
 
 #  Main game loop, runs until window x'd out or someone wins
 update_scores(tank1,tank2)   # put up initial scores
