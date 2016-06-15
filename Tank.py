@@ -5,12 +5,14 @@
     ver 1.0 Added all competition capibilities
 	-On each side there are a given amount of bot tanks and 1 'Master' tank
 		~The robot tanks have less range than the command tank
-		~The Master tank has longer range than the robot tanks 
+		~The Master tank has longer range than the robot tanks
+    ver 1.1 Change robot tank inits to use parent Tank class init
 
  
 Programmer Changelog
 
-Loqoman - 6/6/2016 9:16PM - Began this changelog and removed out mine blip '''
+Loqoman - 6/6/2016 9:16PM - Began this changelog and removed out mine blip 
+IslandSparky - 6/15/2016 4PM - Commit version 1.1 above '''
 
 import pygame, sys, time, random,math
 from pygame.locals import *
@@ -57,26 +59,26 @@ class Tank(object):
             tank.move()
 
         return # return from Tank.move_all
+    def  __init__(self,center=(500,500),color=YELLOW,size=25,direction=180,
+                  lives=1,ammo=10,speed=1,max_range=WINDOWWIDTH/4,army=RED,
+                  tank_type='Master'):
 
-    def  __init__(self,center=(500,500),color=YELLOW,size=25,direction = 90,
-                  lives=5,ammo=25,speed=0,army=YELLOW):
 
     # This is the initializer called each time you create a new tank.
     # The size is specified as a single variable because the tank is drawn
     # in a square.
+        self.home = center  # remember center as the home base
         self.color = color
         self.size = size
         self.direction = direction # direction the tank (and gun) is pointed
         self.lives = lives  # number of lives we have
         self.ammo = ammo    # number of rounds we can fire in each life
-
         self.speed = speed
+        self.max_range = max_range  # range of cannon
         self.army = army    # army he belongs to
-        self.home = center  # remember center as the home base
 
         # add this tank to the list of tanks
         Tank.tanks.append(self)
-
 
         # dx and dy are the distance accumulators for the distance not moved
         # by the integer pixel count
@@ -299,46 +301,20 @@ class Red_Robot_Tank(Tank):
                   lives=1,ammo=10,speed=1,max_range=WINDOWWIDTH/10,army=RED,
                   tank_type='Scout'):
 
-    # This is the initializer called each time you create a new robot tank.
-    # The size is specified as a single variable because the tank is drawn
-    # in a square.
-        self.color = color
-        self.size = size
-        self.direction = direction # direction the tank (and gun) is pointed
-        self.direction_to_target = self.direction # init value before targeting
-        self.lives = lives  # number of lives we have
-        self.ammo = ammo    # number of rounds we can fire in each life
-        self.speed = speed
-        self.max_range = max_range
-        self.army = army    # army he belongs to 
-        self.tank_type = tank_type  # Either 'Scout' or 'Master' 
+        '''# This is the initializer called each time you create a new robot tank.
+        # The size is specified as a single variable because the tank is drawn
+        # in a square.'''
 
+        # Call the parent (Tank) class initializer for general setup
+        super().__init__(center,color,size,direction,
+                  lives,ammo,speed,max_range,army,
+                  tank_type)
+        
+        # Set up special stuff for robots
         self.target = None  # initially not targeted, otherwise hold target tank
         self.lockout_timer = 0 # initially not lock out of targeting
-    
-        self.home = center  # remember center as the home base
 
-        # add this tank to the list of tanks
-        Tank.tanks.append(self)
-
-
-        # dx and dy are the distance accumulators for the distance not moved
-        # by the integer pixel count
-        self.dx = 0.
-        self.dy = 0.
-
-        # build a rectangle for this tank and save as an attribute
-        # center was given rather than topleft, so adjust for half the size
-        self.rect = pygame.Rect(center[0]-int(size/2),
-                                center[1]-int(size/2),size,size)
-
-        ''' Put in logic here to check if we are on an already existing tank or barrier
-                and if so, move slightly to get off it.  '''
         
-
-        # now draw the tank
-        self.draw()
-
         return # return from Robot_Tank.__init__
 
     def move(self):
@@ -424,52 +400,27 @@ class Red_Robot_Tank(Tank):
 class Yellow_Robot_Tank(Tank):
 
 
-    def  __init__(self,center=(500,500),color=LIGHTRED,size=25,direction=180,
-                  lives=1,ammo=10,speed=1,max_range=WINDOWWIDTH/10,army=RED,
+    def  __init__(self,center=(500,500),color=LIGHTYELLOW,size=25,direction=180,
+                  lives=1,ammo=10,speed=1,max_range=WINDOWWIDTH/10,army=YELLOW,
                   tank_type='Scout'):
 
-    # This is the initializer called each time you create a new robot tank.
-    # The size is specified as a single variable because the tank is drawn
-    # in a square.
-        self.color = color
-        self.size = size
-        self.direction = direction # direction the tank (and gun) is pointed
-        self.direction_to_target = self.direction # init value before targeting
-        self.lives = lives  # number of lives we have
-        self.ammo = ammo    # number of rounds we can fire in each life
-        self.speed = speed
-        self.max_range = max_range
-        self.army = army    # army he belongs to
-        self.tank_type = tank_type  # Either 'Scout' or 'Master' 
+        '''# This is the initializer called each time you create a new robot tank.
+        # The size is specified as a single variable because the tank is drawn
+        # in a square.'''
 
+        # Call the parent (Tank) class initializer for general setup
+        super().__init__(center,color,size,direction,
+                  lives,ammo,speed,max_range,army,
+                  tank_type)
+        
+        # Set up special stuff for robots
         self.target = None  # initially not targeted, otherwise hold target tank
         self.lockout_timer = 0 # initially not lock out of targeting
-    
-        self.home = center  # remember center as the home base
 
-        # add this tank to the list of tanks
-        Tank.tanks.append(self)
-
-
-        # dx and dy are the distance accumulators for the distance not moved
-        # by the integer pixel count
-        self.dx = 0.
-        self.dy = 0.
-
-        # build a rectangle for this tank and save as an attribute
-        # center was given rather than topleft, so adjust for half the size
-        self.rect = pygame.Rect(center[0]-int(size/2),
-                                center[1]-int(size/2),size,size)
-
-        ''' Put in logic here to check if we are on an already existing tank or barrier
-                and if so, move slightly to get off it.  '''
         
-
-        # now draw the tank
-        self.draw()
-
         return # return from Robot_Tank.__init__
-
+    
+  
     def move(self):
     # Overload the tank move class so we can check for special actions for the
     # robot.  It calls the Tank class move and shoot methods to do the actual
