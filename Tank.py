@@ -8,13 +8,16 @@
 		~The Master tank has longer range than the robot tanks
     ver 1.1 Change robot tank inits to use parent Tank class init
     ver 2.0 Require all tanks to be killed to win game
+    ver 2.1 Enhanced red tank logic to better clear barriers and lock on nearest
+            enemy target. It's murder on yellow.
 
  
 Programmer Changelog
 
 Loqoman - 6/6/2016 9:16PM - Began this changelog and removed out mine blip 
 IslandSparky - 6/15/2016 4PM - Commit version 1.1 above
-IslandSparky - 6/24/2016 10 AM - Commit version 2.0 above'''
+IslandSparky - 6/24/2016 10 AM - Commit version 2.0 above
+IslandSparky - 7/7/2016 9PM - Commit version 2.1'''
 
 import pygame, sys, time, random,math
 from pygame.locals import *
@@ -336,20 +339,31 @@ class Red_Robot_Tank(Tank):
         LOCKOUTTIME = 1  # LOCK OUT RETARGETING (NUMBER OF GAME CYCLES)       
         ALLOWED_AIM_ERROR = 2 # Allow 2 degrees error in aim.
 
-        #if someone else already killed your target, choose another
+        '''#if someone else already killed your target, choose another
         if self.target != None:
             if self.target.lives <= 0:
-                self.target = None
+                self.target = None'''
 
         # if not locked on target, choose a live one at random
         if self.lockout_timer > 0:  # Don't retarget during lockout
             self.lockout_timer -= 1  # Count down the timer
         else:
-            index = random.randrange(0,len(Tank.tanks))  # choose a random tank
+            '''index = random.randrange(0,len(Tank.tanks))  # choose a random tank
             if  ((Tank.tanks[index] != self) &
                (Tank.tanks[index].lives >0)):   # see if this tank is still alive
                     if ( Tank.tanks[index].army != self.army ):  # don't kill one of your own
-                        self.target = Tank.tanks[index] # live duck, latch on
+                        self.target = Tank.tanks[index] # live duck, latch on '''
+
+            shortest_distance = 10000  # large number for default
+            for tank in Tank.tanks:
+                if ( (tank != self) & (tank.army != self.army)  &
+                     (tank.lives > 0) ):
+                     direction,distance = locate(self.rect,tank.rect)
+                     if distance < shortest_distance:
+                         self.target = tank
+                         shortest_distance = distance
+                         self.lockout_timer = LOCKOUTTIME  # dont retarget for this many cycles
+        
 
 
 # If we have a target, see if we can shoot him.
@@ -361,6 +375,7 @@ class Red_Robot_Tank(Tank):
             self.direction_to_target,distance_to_target = locate(self.rect,self.target.rect)
 
             # see if gun is pointed in his direction
+
             if (is_aim_ok(self.direction,self.direction_to_target,ALLOWED_AIM_ERROR)):
           
            
@@ -368,34 +383,41 @@ class Red_Robot_Tank(Tank):
                 if abs(distance_to_target) < self.max_range:
                     
                     if(self.shoot(max_range = self.max_range) == 'Hit_Barrier'):
-                        self.direction = self.direction- (random.randrange(100,260))
-                        if self.direction < 0 :
-                            self.direction += (360)  # keep in 0 to 360 degrees
+                        self.unstick()      # choose a new direction to avoid obstacle
                         self.lockout_timer = LOCKOUTTIME # don't retarget until we clear barrier                   
                     self.target = None  # Drop this guy as a target
 
         # Slew the turrent toward the target by a slew angle increment
+
             self.direction = slew(self.direction,self.direction_to_target,SLEWANGLE)
+
 
         # Move, if we bumped into something, reverse direction
         # and unlock from any targets.
 
         stuck = Tank.move(self)
         if stuck == True:  # True means we are stuck against something
-            self.direction = self.direction- (random.randrange(100,260))
-            if self.direction < 0 :
-                self.direction += 360  # keep in 0 to 360 degrees
-            elif self.direction > 360:
-                self.direction -= 360
+            self.unstick()
             self.target = None  # unlock from any targets
             self.lockout_timer = LOCKOUTTIME # don't retarget until we clear obstacle
 
             Tank.move(self) # back away from barrier
 
-
-
-
         return # return from red Robot_Tank.move
+
+    # method of robot tank logic to get unstuck from collision with barrier or tank
+    # changes self.direction to avoid obstacle
+    def unstick(self):
+        avoid = random.randrange(10,90) # choose a random turn to get away from barrier
+        if random.randint(0,1) == 1:
+            avoid = -avoid   # turn left half the time
+        self.direction = self.direction + avoid
+        if self.direction < 0 :
+            self.direction += 360  # keep in 0 to 360 degrees
+        elif self.direction > 360:
+            self.direction -= 360
+
+        return # return with direction changed
 
 ###################################################################################
 #### End of competition logic for red robot tanks
@@ -465,7 +487,8 @@ class Yellow_Robot_Tank(Tank):
             self.direction_to_target,distance_to_target = locate(self.rect,self.target.rect)
 
             # see if gun is pointed in his direction
-            if (is_aim_ok(self.direction,self.direction_to_target,ALLOWED_AIM_ERROR)):
+            aim_tolerance = ALLOWED_AIM_ERROR * (self.max_range/distance_to_target) ** 2
+            if (is_aim_ok(self.direction,self.direction_to_target,tolerance=aim_tolerance)):
           
            
                 # aim is OK, if target in range of our gun, shoot and unlock from him
@@ -629,6 +652,11 @@ def slew(direction,direction_to_target,slewangle):
 
    
     delta_angle = direction_to_target - direction
+    # correct for cross the zero axis
+    if delta_angle < 0:
+        delta_angle += 360
+    if delta_angle > 360:
+        delta_angle -= 360
 
     if  ((delta_angle <0) & (abs(delta_angle) >= 180) ):
         slew = 'left'
@@ -679,6 +707,8 @@ def locate(source_rectangle,destination_rectangle):
     if (xtotarget == 0) :  # avoid infinite atan function
         xtotarget = 1  # avoid a divide by zero
     direction_to_target = 57.3 * math.atan(ytotarget/xtotarget)
+    if direction_to_target <0:
+        direction_to_target += 360
     if xtotarget < 0:
         direction_to_target = direction_to_target + 180
 
@@ -697,13 +727,13 @@ def is_aim_ok(direction,direction_to_target,tolerance):
 
     # first fix any issues with crossing the zero axis.
 
-    if (  (direction > 0 & (direction < 90) ) &
+    if (  ((direction > 0) & (direction < 90) ) &
             (direction_to_target >270) ):
 
             direction += 180  # move to left quantrant
             direction_to_target -= 180
 
-    elif ( (direction_to_target > 0 & (direction_to_target < 90) ) &
+    elif ( ((direction_to_target > 0) & (direction_to_target < 90) ) &
             (direction > 270) ):
 
            direction_to_target += 180 # move to left quantrant
@@ -712,8 +742,9 @@ def is_aim_ok(direction,direction_to_target,tolerance):
     # that possible problem fixed, now do the compare and return
     # either true or false
 
-   
-    if ( abs(direction - direction_to_target) <= tolerance ):
+    delta_angle = direction - direction_to_target
+
+    if ( abs(delta_angle) <= tolerance ):
         return True
     else:
         return False
@@ -870,7 +901,8 @@ for i in range (0, NUMBERBARRIERS):
 if NUMBERREDROBOTS > 0:  # First the red robots
     for i in range(0,NUMBERREDROBOTS):
         Red_Robot_Tank(speed=2, center=( 200,WINDOWHEIGHT-100- (65*i) ),
-                      direction=0,color=LIGHTRED,army=RED,
+
+                       direction=0,color=LIGHTRED,army=RED,
                       max_range=WINDOWWIDTH/10,tank_type='Scout')
 
 if NUMBERYELLOWROBOTS > 0:  # Then the yellow robots
